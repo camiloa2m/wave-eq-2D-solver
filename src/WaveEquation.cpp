@@ -138,6 +138,8 @@ void WaveEquation::assemble_matrices()
     // Current implementation assumes homogeneous Neumann (natural) BCs, so no additional terms are added.
 
     cell->get_dof_indices(dof_indices);
+    // The constraints object will handle the application of Dirichlet BCs during assembly, 
+    // ensuring that the resulting global matrices are consistent with the specified boundary conditions.
     constraints.distribute_local_to_global(cell_mass, dof_indices, mass_matrix);
     constraints.distribute_local_to_global(cell_stiffness, dof_indices, stiffness_matrix);
   }
@@ -184,7 +186,7 @@ void WaveEquation::solve_timestep() {
   SolverCG<TrilinosWrappers::MPI::Vector> cg(solver_control);
 
   cg.solve(system_matrix, velocity_owned, rhs_owned, prec);
-  constraints.distribute(velocity_owned);
+  //constraints.distribute(velocity_owned); // enforce BCs + update ghosts
   pcout << "  Linear solver: " << solver_control.last_step() << " CG iterations." << std::endl;
 
   // 4. Update displacement U_{n+1} using the theta method: U_{n+1} = U_n + dt*(theta*V_{n+1} + (1-theta)*V_n)
@@ -192,7 +194,7 @@ void WaveEquation::solve_timestep() {
   solution_owned = old_solution_owned;
   solution_owned.add(theta * delta_t, velocity_owned);
   solution_owned.add((1.0 - theta) * delta_t, old_velocity_owned);
-  constraints.distribute(solution_owned);
+  //constraints.distribute(solution_owned); // enforce BCs + update ghosts
 
   // Final sync and state update
   solution = solution_owned;
